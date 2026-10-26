@@ -1,57 +1,58 @@
 import './bootstrap';
 import 'bootstrap';
 
-// Animate on scroll – lightweight IntersectionObserver
-const observeElements = () => {
+// ── Scroll-reveal via IntersectionObserver ──
+const initScrollReveal = () => {
     const els = document.querySelectorAll('[data-animate]');
     if (!els.length) return;
 
-    const observer = new IntersectionObserver((entries) => {
+    const io = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
-                entry.target.classList.add('animate-fade-in-up');
-                entry.target.style.opacity = '1';
-                observer.unobserve(entry.target);
+                entry.target.classList.add('is-visible');
+                io.unobserve(entry.target);
             }
         });
-    }, { threshold: 0.1 });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
 
-    els.forEach(el => {
-        el.style.opacity = '0';
-        observer.observe(el);
-    });
+    els.forEach(el => io.observe(el));
 };
 
-// Mobile nav toggle
+// ── Mobile nav toggle ──
 const initMobileNav = () => {
-    const toggle = document.getElementById('mobile-menu-toggle');
-    const menu   = document.getElementById('mobile-menu');
+    const toggle  = document.getElementById('mobile-menu-toggle');
+    const menu    = document.getElementById('mobile-menu');
+    const iconMenu  = document.getElementById('icon-menu');
+    const iconClose = document.getElementById('icon-close');
     if (!toggle || !menu) return;
 
-    toggle.addEventListener('click', () => {
-        menu.classList.toggle('hidden');
-        const icon = toggle.querySelector('svg');
-        if (icon) {
-            icon.classList.toggle('rotate-90');
-        }
-    });
+    const open  = () => { menu.classList.remove('hidden'); iconMenu?.classList.add('hidden');  iconClose?.classList.remove('hidden'); };
+    const close = () => { menu.classList.add('hidden');    iconMenu?.classList.remove('hidden'); iconClose?.classList.add('hidden'); };
+
+    toggle.addEventListener('click', () => menu.classList.contains('hidden') ? open() : close());
+
+    // Close when clicking a nav link in the mobile menu
+    menu.querySelectorAll('a').forEach(a => a.addEventListener('click', close));
 };
 
-// Sticky header shadow on scroll
+// ── Sticky header shadow ──
 const initStickyHeader = () => {
     const header = document.getElementById('public-header');
     if (!header) return;
 
-    window.addEventListener('scroll', () => {
-        if (window.scrollY > 20) {
-            header.classList.add('shadow-md', 'bg-white/98');
+    const update = () => {
+        if (window.scrollY > 30) {
+            header.style.boxShadow = '0 4px 24px rgba(0,0,0,0.08)';
         } else {
-            header.classList.remove('shadow-md', 'bg-white/98');
+            header.style.boxShadow = 'none';
         }
-    });
+    };
+
+    window.addEventListener('scroll', update, { passive: true });
+    update();
 };
 
-// Gallery lightbox (simple)
+// ── Gallery lightbox ──
 const initGalleryLightbox = () => {
     const items   = document.querySelectorAll('.gallery-item');
     const overlay = document.getElementById('gallery-lightbox');
@@ -61,62 +62,97 @@ const initGalleryLightbox = () => {
     const caption = overlay.querySelector('#lightbox-caption');
     const close   = overlay.querySelector('#lightbox-close');
 
-    items.forEach(item => {
-        item.addEventListener('click', () => {
-            const src = item.dataset.src;
-            const cap = item.dataset.caption || '';
-            img.src     = src;
-            caption.textContent = cap;
-            overlay.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
+    const openLightbox = (src, cap) => {
+        img.src = src;
+        caption.textContent = cap;
+        overlay.classList.remove('hidden');
+        overlay.style.opacity = '0';
+        requestAnimationFrame(() => {
+            overlay.style.transition = 'opacity 0.25s ease';
+            overlay.style.opacity = '1';
         });
-    });
-
-    const closeLightbox = () => {
-        overlay.classList.add('hidden');
-        document.body.style.overflow = '';
+        document.body.style.overflow = 'hidden';
     };
 
-    close.addEventListener('click', closeLightbox);
-    overlay.addEventListener('click', (e) => {
-        if (e.target === overlay) closeLightbox();
-    });
-
-    document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeLightbox();
-    });
-};
-
-// Flash message auto-hide
-const initFlashMessages = () => {
-    const flashes = document.querySelectorAll('.flash-message');
-    flashes.forEach(flash => {
+    const closeLightbox = () => {
+        overlay.style.opacity = '0';
         setTimeout(() => {
-            flash.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
-            flash.style.opacity    = '0';
-            flash.style.transform  = 'translateY(-10px)';
-            setTimeout(() => flash.remove(), 500);
-        }, 4000);
+            overlay.classList.add('hidden');
+            document.body.style.overflow = '';
+        }, 250);
+    };
+
+    items.forEach(item => {
+        item.addEventListener('click', () => openLightbox(item.dataset.src, item.dataset.caption || ''));
+    });
+
+    close?.addEventListener('click', closeLightbox);
+    overlay.addEventListener('click', e => { if (e.target === overlay) closeLightbox(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLightbox(); });
+};
+
+// ── Flash message auto-hide ──
+const initFlashMessages = () => {
+    document.querySelectorAll('.flash-message').forEach(el => {
+        setTimeout(() => {
+            el.style.transition = 'opacity 0.5s, transform 0.5s';
+            el.style.opacity    = '0';
+            el.style.transform  = 'translateY(-10px)';
+            setTimeout(() => el.remove(), 500);
+        }, 4500);
     });
 };
 
-// Admin sidebar active state
-const initSidebarActive = () => {
-    const links = document.querySelectorAll('.sidebar-link');
-    const current = window.location.pathname;
-    links.forEach(link => {
-        if (link.getAttribute('href') === current) {
-            link.classList.add('active');
-        }
-    });
+// ── Smooth active nav link highlighting ──
+const initActiveNavHighlight = () => {
+    const sections = document.querySelectorAll('section[id], footer[id]');
+    const links    = document.querySelectorAll('.nav-link-public');
+    if (!sections.length || !links.length) return;
+
+    const io = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                links.forEach(l => l.classList.remove('text-amber-600'));
+                const active = document.querySelector(`.nav-link-public[href*="#${entry.target.id}"]`);
+                active?.classList.add('text-amber-600');
+            }
+        });
+    }, { threshold: 0.4 });
+
+    sections.forEach(s => io.observe(s));
 };
 
-// Initialize all
+// ── Counter animation for stat numbers ──
+const initCounters = () => {
+    const counters = document.querySelectorAll('[data-count]');
+    if (!counters.length) return;
+
+    const io = new IntersectionObserver(entries => {
+        entries.forEach(entry => {
+            if (!entry.isIntersecting) return;
+            const el  = entry.target;
+            const end = parseInt(el.dataset.count);
+            let   cur = 0;
+            const step = Math.ceil(end / 50);
+            const timer = setInterval(() => {
+                cur = Math.min(cur + step, end);
+                el.textContent = cur + (el.dataset.suffix || '');
+                if (cur >= end) clearInterval(timer);
+            }, 30);
+            io.unobserve(el);
+        });
+    }, { threshold: 0.5 });
+
+    counters.forEach(el => io.observe(el));
+};
+
+// ── Initialize all ──
 document.addEventListener('DOMContentLoaded', () => {
-    observeElements();
+    initScrollReveal();
     initMobileNav();
     initStickyHeader();
     initGalleryLightbox();
     initFlashMessages();
-    initSidebarActive();
+    initActiveNavHighlight();
+    initCounters();
 });
