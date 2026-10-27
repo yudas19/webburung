@@ -1,7 +1,7 @@
 FROM php:8.2-fpm-alpine
 
 # Set working directory
-WORKDIR /var/www/html
+WORKDIR /var/www/
 
 # Install system dependencies and build libraries
 RUN apk add --no-cache \
